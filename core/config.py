@@ -16,8 +16,9 @@ except Exception:
     pass
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / 'data'
-LOG_DIR = BASE_DIR / 'logs'
+# 可指向项目外的数据盘/归档目录（DLR_DATA_DIR / DLR_LOG_DIR），便于异地分析或数据盘另置
+DATA_DIR = Path(os.getenv('DLR_DATA_DIR') or (BASE_DIR / 'data'))
+LOG_DIR = Path(os.getenv('DLR_LOG_DIR') or (BASE_DIR / 'logs'))
 for _d in (DATA_DIR, LOG_DIR):
     _d.mkdir(exist_ok=True)
 

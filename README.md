@@ -23,6 +23,7 @@
 | 语音转写 | faster-whisper medium + CUDA，实测 **约 12x 实时** |
 | 时间轴稿 | 同一音频落两份：`audio.txt`（纯文本）+ `audio.timed.txt`（`[HH:MM:SS] 文本`） |
 | 收尾兜底 | `catchup.py`：进程被强杀导致的缺稿自动补齐，幂等可重跑 |
+| 出稿成稿 | `digest.py`：`*.timed.txt` → 结构化笔记 md，**时间点强制回校**，编造的会被剥掉 |
 | 空间回收 | 三重闸门判定「稿子已出」后清理原始媒体，可走回收站 |
 | 通知 | SMTP 直发 / outbox 队列（解耦给任何外部发信环节） |
 | LLM 总结 | 任意 OpenAI 兼容接口，map-reduce 分段摘要（可选） |
@@ -89,6 +90,16 @@ python catchup.py --date 2026-10-09
 python catchup.py --since-days 3                     # 最近 3 天
 python catchup.py --dry-run                          # 只列清单，不动任何文件
 
+# --- 出稿成稿（幂等，可重复跑）---
+python digest.py                                     # 今天，有稿但没出稿的场次
+python digest.py --date 2026-10-09
+python digest.py --since-days 3
+python digest.py --dry-run                           # 只列清单，不调模型、不写文件
+python digest.py --no-llm                            # 不调模型，只出「元信息 + 时间轴」骨架
+python digest.py --force                             # 忽略幂等，重出稿
+python digest.py --anchors anchors.json               # 用 alias 作笔记里的主播名
+python digest.py --notes-dir D:\Note\直播监控          # 覆盖笔记输出目录
+
 # --- 空间回收 ---
 python catchup.py --purge-dry-run                    # 只列出会删哪些
 python catchup.py --purge --purge-trash              # 真删，走回收站（可恢复）
@@ -112,11 +123,13 @@ python notifier.py list                              # 查看待发送通知
 |---|---|---|
 | ① 值守 | 计划任务 → `scheduler.py` | 每 N 秒探测开播，开播即录到下播；`--run-for` 兜底强制收尾 |
 | ② 收尾 | 计划任务 → `catchup.py` | 补齐被强杀场次的转写与封片（幂等） |
-| ③ 出稿 | 任意环节（人 / LLM / 脚本） | 读 `*.txt` + `*.timed.txt` → 生成 Markdown 笔记 |
+| ③ 出稿 | 计划任务 → `digest.py` | 读 `*.txt` + `*.timed.txt`，调 LLM 归纳 → 笔记 md |
 | ④ 清理 | 计划任务 → `catchup.py --purge` | 笔记已落地则清理原始媒体，只留几 KB 的转写稿 |
 
-③ 段不在本仓库内 —— 它是「消费转写稿」的自由环节。本仓库负责把稿子**可靠地
-生产出来并带上时间基准**（`*.timed.txt`），出稿用什么工具都行。
+③ 段**独立成脚本、不塞进值守进程**：一场录制跑几小时，不该因为一次 LLM 接口 429
+就整个趴下。出稿是「随时可补、失败了重跑即可」的环节，所以按需调用、幂等可重跑。
+不想用 LLM 也没关系 —— 本仓库只保证把稿子**可靠地生产出来并带上时间基准**
+（`*.timed.txt`），你完全可以换成自己的出稿环节。
 
 ### 注册计划任务
 
@@ -210,6 +223,7 @@ Linux / macOS 等价的 crontab：
 | `quality` | 抖音：`ORIGION` / `FULL_HD1` / `HD1` / `SD1` / `SD2` |
 | `qn` | B站画质：`10000` 原画 / `400` 蓝光 / `250` 超清 / `150` 高清 |
 | `enabled` | `false` 则值守时跳过（但 `--check` 仍会探测，见坑位 17） |
+| `alias` | 可选。**笔记里显示的主播名**，优先级 `alias > nickname > meta.json`。平台昵称常带 emoji、会改名、会撞名，出稿文件名用它就永远在变；填个稳定的 `alias` 既能固定笔记名，也能避开与历史笔记重名 |
 | `max_seconds` | 单场最长录制秒数，`0` 不限 |
 | `auto_transcribe` | 值守段内联转写。**建议保持 `false`** |
 
@@ -367,6 +381,20 @@ data/<platform>_<room>/<YYYY-MM-DD>/<YYYYMMDD_HHMMSS>/
     不需要额外的一次性任务定义。核验：
     `(Get-ScheduledTask -TaskName X).Actions[0].Arguments` 读回。
 
+23. **正则去匹配「整份时间轴稿」时必须带 `re.MULTILINE`** —— `^\[(\d{1,3}:\d{2}:\d{2})\]`
+    这种按行锚定的模式，拿去 `finditer` 一大段多行文本时，**没有 `re.M` 的 `^$`
+    只锚整串的开头与结尾**，结果匹配数恒为 0。此时的表征很有迷惑性：程序不报错，
+    只是「一个合法时间点都没找到」，于是出稿段**把模型写对的时间点也当成编造全剥掉**，
+    交出一份没有任何时间的笔记 —— 看起来像模型不听话，实则是自己的正则失灵。
+    更阴的是同一份正则拿去 `re.sub` 单行（如 frontmatter）时又是对的，
+    让人在别处反复排查。
+
+24. **喂给出稿模型的「合法时间点清单」不能截断** —— 模型只被允许引用清单里存在的
+    时间点，校验段据此判真假。若为省 token 把清单砍一刀（比如只给前 200 个），
+    **后半场的真实时间点会被判成编造，连同正确的观点一起被剥掉**，
+    而错在前 200 个之外、肉眼极难发现。现做法：全量喂，超过 1500 个才抽样，
+    且抽样是「均匀抽」而非「取前 1500」。
+
 ---
 
 ## 目录结构
@@ -378,9 +406,11 @@ record/      recorder.py  finalizer.py  probe_stream.py
 pipeline/    transcriber.py（CUDA 自举 + 转写 + SRT）  summarizer.py（OpenAI 兼容）
 scheduler.py   常驻值守（单实例锁 / --exit-after-sessions / --run-for）
 catchup.py     收尾兜底（补转写 + 封片 + 清理，幂等可重跑）
+digest.py      出稿成稿（*.timed.txt → 笔记 md，时间点回校，幂等可重跑）
 register_tasks.ps1  注册 Windows 计划任务
 notifier.py    通知（SMTP / outbox）
-anchors.example.json  配置样例
+prompts/digest.md    出稿提示词（可自行替换）
+anchors.example.json 配置样例
 ```
 
 ---

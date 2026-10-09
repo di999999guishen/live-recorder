@@ -4,10 +4,12 @@
     "抖音：打开直播间，链接形如 https://live.douyin.com/<rid>；推荐页形态则取 URL 里的 live_web_rid= 参数（parse_web_rid 优先匹配它）。",
     "B站：直播间链接 https://live.bilibili.com/<房间号>，短号也可以，脚本会先用 get_info 映射成真实 room_id。"
   ],
+  "_alias说明": "可选。digest.py 出稿时用它当代替平台昵称，作为笔记文件名与 frontmatter 里的「主播」名。平台昵称可能带 emoji、可能随时改名、不同主播可能撞名，别名能让笔记目录保持稳定整洁。不填则退回平台昵称。",
   "anchors": [
     {
       "platform": "douyin",
       "room": "123456789012",
+      "alias": "示例主播",
       "mode": "audio",
       "quality": "HD1",
       "enabled": true,

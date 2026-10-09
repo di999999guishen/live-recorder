@@ -18,6 +18,8 @@ notes/
 .env
 .env.local
 anchors.json
+# 别把私人主播配置（房间号/别名）误传上来；示例用 anchors.example.json
+anchors_*.json
 
 # 编辑器 / 系统
 .vscode/

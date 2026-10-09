@@ -1,5 +1,5 @@
 ﻿# =====================================================================
-#  注册本工具的 Windows 计划任务（值守 / 收尾 / 清理 三段）
+#  注册本工具的 Windows 计划任务（值守 / 收尾 / 出稿 / 清理 四段）
 #
 #  用法（管理员权限 PowerShell）：
 #      powershell -ExecutionPolicy Bypass -File .\register_tasks.ps1
@@ -74,7 +74,20 @@ Register-LrTask -Name 'LR-Catchup-AM' -Script (Join-Path $proj 'catchup.py') `
 Register-LrTask -Name 'LR-Catchup-PM' -Script (Join-Path $proj 'catchup.py') `
     -Arguments '--since-days 2' -At '18:15' -LimitHours 3
 
-# --- ③ 清理段（出稿 md 已落地 -> 释放原始媒体，只留转写稿）---------------
+# --- ③ 出稿段（转写稿 -> 笔记 md + 归档 summary.md）---------------------
+# 排在收尾段之后：收尾段先把转写补齐，这里才拿得到 *.timed.txt。
+# 必须排在清理段之前 —— 清理段的三重闸门之一就是「笔记 md 已落地」。
+#
+# 幂等：笔记 md 不比转写稿旧就跳过，所以多跑几次没有副作用，漏跑一次次日也会补上。
+# 需要 .env 里的 LLM_API_KEY；没配则整体退出码 2，不会写出半成品 —— 若确实想先
+# 不上模型，把下面的参数改成 '--since-days 2 --no-llm'，会落「时间轴骨架」稿。
+Register-LrTask -Name 'LR-Digest-AM' -Script (Join-Path $proj 'digest.py') `
+    -Arguments '--since-days 2' -At '12:30' -LimitHours 2
+
+Register-LrTask -Name 'LR-Digest-PM' -Script (Join-Path $proj 'digest.py') `
+    -Arguments '--since-days 2' -At '18:30' -LimitHours 2
+
+# --- ④ 清理段（出稿 md 已落地 -> 释放原始媒体，只留转写稿）---------------
 # 21:00，排在出稿环节之后，确保 md 已经写出来。
 # 删不删完全由 purge_media 的三重闸门决定（转写完整 / 确实停写 / 已出稿且 md
 # 晚于转写稿），任何一条不满足就跳过，所以早跑晚跑都不会误删。
