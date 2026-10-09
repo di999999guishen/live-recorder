@@ -1,0 +1,29 @@
+{
+  "_说明": "主播监控配置示例。复制成 anchors.json 后填入自己的房间号即可。",
+  "_房间号怎么取": [
+    "抖音：打开直播间，链接形如 https://live.douyin.com/<rid>；推荐页形态则取 URL 里的 live_web_rid= 参数（parse_web_rid 优先匹配它）。",
+    "B站：直播间链接 https://live.bilibili.com/<房间号>，短号也可以，脚本会先用 get_info 映射成真实 room_id。"
+  ],
+  "anchors": [
+    {
+      "platform": "douyin",
+      "room": "123456789012",
+      "mode": "audio",
+      "quality": "HD1",
+      "enabled": true,
+      "max_seconds": 0,
+      "auto_transcribe": false,
+      "remark": "示例：抖音主播。auto_transcribe 建议保持 false，转写交给 catchup.py 在值守结束后统一跑。"
+    },
+    {
+      "platform": "bilibili",
+      "room": "1234567",
+      "mode": "audio",
+      "qn": 10000,
+      "enabled": false,
+      "max_seconds": 0,
+      "auto_transcribe": false,
+      "remark": "示例：B站主播。qn 10000=原画 / 400=蓝光 / 250=超清 / 150=高清。"
+    }
+  ]
+}

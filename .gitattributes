@@ -1,0 +1,19 @@
+# 统一换行符，避免跨平台 diff 噪声
+* text=auto eol=lf
+
+# Windows 脚本必须 CRLF（PowerShell / 批处理）
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制
+*.aac binary
+*.mp4 binary
+*.flac binary
+*.m4a binary
+*.png binary
+*.jpg binary
+
+# 让 Git 把转写稿当文本处理，便于 diff
+*.txt text
+*.md text

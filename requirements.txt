@@ -1,0 +1,11 @@
+# 核心依赖（开播探测 + 录制调度 + 文稿落盘）
+requests>=2.31.0
+python-dotenv>=1.0.0
+zhconv>=1.4.3
+
+# 语音转写是可选重量级依赖，按需单独装：
+#   pip install faster-whisper
+# CUDA 加速另需对应 nvidia-*-cu12 轮子（见 pipeline/transcriber.py 的自举逻辑）。
+# 系统另需 ffmpeg / ffprobe 在 PATH 中（录制与封片依赖）。
+
+# LLM 总结（可选）复用 requests，无需额外依赖。

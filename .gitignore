@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 运行时产物
+data/
+logs/
+outbox/
+notes/
+.lock/
+*.log
+
+# 本地配置与密钥
+.env
+.env.local
+anchors.json
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
