@@ -9,6 +9,15 @@
 默认 **audio 模式**（只留音轨）：抖音实测约 **51 MB/小时**，够转写和做笔记，
 比 video 模式（约 0.9 GB/小时）省 18 倍空间。
 
+与姊妹项目 [up-notify](https://github.com/di999999guishen/up-notify) 的分工：
+
+| 项目 | 盯什么 | 产物 |
+|---|---|---|
+| **live-recorder**（本项目） | 主播的**直播内容** | 录音 + 转写 + 总结 md |
+| up-notify | UP 主的**新作品** | 通知（邮件 / outbox 队列） |
+
+两者共用 `notifier` 的双后端设计（SMTP 直发 / outbox 队列解耦），可以接到同一个发信环节上。
+
 ---
 
 ## 能力
