@@ -42,7 +42,13 @@ def load_llm_config() -> dict:
 
 
 def call_llm(cfg: dict, system: str, user: str, temperature: float = 0.3,
-             timeout: int = 180) -> str:
+             timeout: int = 180, max_tokens: int = 0) -> str:
+    """调用 OpenAI 兼容的 /chat/completions。
+
+    max_tokens=0 表示不带该字段，交给服务端默认值。**出稿这类需要长输出的场景
+    应当显式给一个较大的值** —— 不少模型（如 glm-4-flash）默认输出上限只有
+    1024 token，长要点会在中途被静默截断，表现为「模型好像只写了一半」。
+    """
     url = cfg['base_url'].rstrip('/') + '/chat/completions'
     headers = {'Authorization': f'Bearer {cfg["api_key"]}', 'Content-Type': 'application/json'}
     payload = {
@@ -51,6 +57,8 @@ def call_llm(cfg: dict, system: str, user: str, temperature: float = 0.3,
                      {'role': 'user', 'content': user}],
         'temperature': temperature,
     }
+    if max_tokens:
+        payload['max_tokens'] = max_tokens
     for attempt in range(3):
         try:
             r = requests.post(url, headers=headers, json=payload, timeout=timeout)

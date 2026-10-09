@@ -367,10 +367,13 @@ def chunk_timed(timed: str, size: int = 6000) -> list:
 
 
 SYSTEM_MAP = ('你是直播内容分析助手。只依据给定文本作答，不得编造、不得补充外部信息。'
-              '时间点只能原样引用文本里已出现的 [HH:MM:SS]，拿不准就不写。')
+              '时间点只能原样引用文本里已出现的 [HH:MM:SS]，拿不准就不写。'
+              '你的输出会被下游汇总成最终笔记，所以宁可详细，不要概括 —— '
+              '信息一旦在这里被压掉，下游再也补不回来。')
 
 SYSTEM_REDUCE = ('你是内容编辑。把分段要点整理成一份结构清晰、可直接存档的中文笔记。'
-                 '只依据给定材料，不得编造时间点、数据或原话。')
+                 '只依据给定材料，不得编造时间点、数据或原话。'
+                 '材料给多少就写多少，不要为了简短而合并或删减有效信息。')
 
 
 def map_extract(cfg: dict, chunks: list) -> list:
@@ -378,14 +381,20 @@ def map_extract(cfg: dict, chunks: list) -> list:
     for i, chunk in enumerate(chunks, 1):
         user = (f'这是某场直播时间轴转写稿的第 {i}/{len(chunks)} 段'
                 f'（每行形如 `[HH:MM:SS] 文本`）。\n'
-                f'请提取：1) 本段主要话题；2) 关键信息与结论；'
-                f'3) 提到的具体名称（人物/产品/板块/数据等）；'
-                f'4) 值得逐字保留的原话（连同它前面的时间点）。\n'
-                f'输出要点列表，每点尽量以 `[HH:MM:SS]` 开头，'
-                f'**时间点必须逐字取自本段文本**。控制在 400 字内。\n\n'
+                f'请尽可能完整地提取本段的全部信息：\n'
+                f'1) 本段的主要话题（逐段标注，不要合并成一句总述）；\n'
+                f'2) 每一个明确的观点、判断、结论 —— 一条一条列，不要归并；\n'
+                f'3) 提到的所有具体名称（人物/产品/板块/标的/数字/数据/日期），'
+                f'每个都要带上它出现时的时间点和上下文；\n'
+                f'4) 值得逐字保留的原话 —— 尽量多摘，连同它前面的时间点。\n'
+                f'输出按时间顺序排列的要点列表，每条以 `[HH:MM:SS]` 开头，'
+                f'**时间点必须逐字取自本段文本**。\n'
+                f'篇幅与原文信息量成正比：本段约 {len(chunk)} 字，'
+                f'要点通常应有 15–40 条；**不要压缩、不要写总结性的套话**，'
+                f'宁可长也不要漏。\n\n'
                 f'【本段原文】\n{chunk}')
         try:
-            out.append(call_llm(cfg, SYSTEM_MAP, user))
+            out.append(call_llm(cfg, SYSTEM_MAP, user, timeout=300, max_tokens=2048))
         except Exception as exc:
             out.append(f'（第 {i} 段提取失败：{exc}）')
         print(f'\r  分段提取 {i}/{len(chunks)}', end='', flush=True)
@@ -428,7 +437,8 @@ def reduce_note(cfg: dict, session_dir: Path, meta: dict, parts: list,
         f'【合法时间点清单】\n{stamp_hint(parse_stamps(timed))}\n\n'
         f'【出稿要求】\n{brief}\n\n'
         f'【各段要点】\n{joined}')
-    return call_llm(cfg, SYSTEM_REDUCE, user, temperature=0.4, timeout=300)
+    return call_llm(cfg, SYSTEM_REDUCE, user, temperature=0.4,
+                    timeout=300, max_tokens=4096)
 
 
 # --------------------------------------------------------------------- 渲染
