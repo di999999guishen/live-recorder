@@ -15,6 +15,9 @@ import requests
 
 PROJECT_ENV = Path(__file__).resolve().parent.parent / '.env'
 FALLBACK_BASE = 'https://open.bigmodel.cn/api/paas/v4'
+# 零配置兜底用 flash（免费、能跑通），但它的出稿质量差：不遵守「按话题归纳」，
+# 会把「核心观点」写成几百条逐句搬运。正经用请在 .env 里配 SUMMARY_MODEL=glm-4-air
+# （详见 README 坑位 28）。
 FALLBACK_MODEL = 'glm-4-flash'
 
 
@@ -41,14 +44,112 @@ def load_llm_config() -> dict:
     return cfg
 
 
+def call_llm_stream(cfg: dict, system: str, user: str, temperature: float = 0.3,
+                    timeout: int = 300, max_tokens: int = 0, on_delta=None,
+                    on_finish=None) -> str:
+    """流式调用 OpenAI 兼容的 /chat/completions，返回完整正文。
+
+    **为什么长输出的调用必须走这里**：智谱网关对「非流式」请求有一条约 190 秒的
+    墙钟上限。glm-4-flash 实测约 18 token/s，出一份 2800 token 的笔记要 155s，
+    离上限极近 —— 服务端一忙（>190s）就直接掐断并回吐
+    `500 {"error":{"code":500,"message":"操作失败"}}`，实测连跑 3 次 3 次都在
+    190.x 秒准时失败，看着像「偶发」其实是确定性的。
+    流式下连接持续有 token 流动，不再受该墙钟上限约束（实测同一载荷流式
+    180.8s 完整拿到 4536 字，非流式同载荷必然 500）。
+
+    timeout 用作**单次读超时**（每个 chunk 之间允许的最大间隔），不是总时长。
+
+    on_finish 回调拿得到 finish_reason（诊断用）。⚠ 但 **finish_reason 不能用来判断
+    稿子是否完整**（实测）：网关撞满 max_tokens 时如实回报 `length`（max_tokens=2000
+    → `length`、产物 2927 字符）；但**模型自己写一半停住时回报 `stop`**（max_tokens=4096
+    → 产物 4131 字符、收到 `[DONE]`、0 个异常帧，却只写了 2 个小节就停）。
+    即两种截断里只有一种能被 finish_reason 抓到，所以判据必须是**结构性的** ——
+    由调用方校验「六小节是否齐全」，见 digest.py 的 missing_sections()。
+    """
+    url = cfg['base_url'].rstrip('/') + '/chat/completions'
+    headers = {'Authorization': f'Bearer {cfg["api_key"]}', 'Content-Type': 'application/json'}
+    payload = {
+        'model': cfg['model'],
+        'messages': [{'role': 'system', 'content': system},
+                     {'role': 'user', 'content': user}],
+        'temperature': temperature,
+        'stream': True,
+    }
+    if max_tokens:
+        payload['max_tokens'] = max_tokens
+    pieces = []
+    finish_reason = None
+    with requests.post(url, headers=headers, json=payload,
+                       timeout=(15, timeout), stream=True) as r:
+        if r.status_code != 200:
+            raise RuntimeError(f'HTTP {r.status_code}: {r.text[:200]}')
+        for raw in r.iter_lines():
+            if not raw:
+                continue
+            line = raw.decode('utf-8', 'replace').strip()
+            if line.startswith('data:'):
+                line = line[5:].strip()
+            if not line:
+                continue
+            if line == '[DONE]':
+                break
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            # 流中途的错误帧（网关限流/超时/内容拦截）**必须抛出**。
+            # 以前写成 `json.loads(line)['choices'][0]` 外面套 except:continue，
+            # 遇到 {"error":{...}} 这种帧会 KeyError 被静默吞掉 —— 表现为「稿子写到
+            # 一半没了」，却既无异常也不触发降级，比报错更难查。
+            if isinstance(obj, dict) and obj.get('error'):
+                raise RuntimeError('LLM 流中断: '
+                                   + json.dumps(obj['error'], ensure_ascii=False)[:200])
+            try:
+                ch = obj['choices'][0]
+            except Exception:
+                continue
+            if ch.get('finish_reason'):
+                finish_reason = ch['finish_reason']
+            piece = (ch.get('delta') or {}).get('content') or ''
+            if piece:
+                pieces.append(piece)
+                if on_delta:
+                    on_delta(piece)
+    if on_finish:
+        on_finish(finish_reason)
+    return ''.join(pieces).strip()
+
+
 def call_llm(cfg: dict, system: str, user: str, temperature: float = 0.3,
-             timeout: int = 180, max_tokens: int = 0) -> str:
+             timeout: int = 180, max_tokens: int = 0, retries: int = 3,
+             stream: bool = False, on_delta=None, on_finish=None) -> str:
     """调用 OpenAI 兼容的 /chat/completions。
 
     max_tokens=0 表示不带该字段，交给服务端默认值。**出稿这类需要长输出的场景
     应当显式给一个较大的值** —— 不少模型（如 glm-4-flash）默认输出上限只有
     1024 token，长要点会在中途被静默截断，表现为「模型好像只写了一半」。
+
+    retries: 总尝试次数（含首次）。注意智谱这类网关在**生成时间过长**时会把请求
+    掐断并回吐 `500 {"error":{"code":500,"message":"操作失败"}}` —— 这种失败是
+    确定性的，重试同一载荷几乎必然再失败，只是把 timeout 白等一遍。需要长生成的
+    调用（出稿的汇总段）应传 retries=1，由调用方自己走「降级策略」。
+
+    stream=True 时走 call_llm_stream()，**长输出的调用都应该开**（见那个函数的
+    说明：非流式有一条约 190 秒的墙钟上限）。
     """
+    if stream:
+        err = ''
+        for attempt in range(max(1, retries)):
+            try:
+                return call_llm_stream(cfg, system, user, temperature=temperature,
+                                       timeout=timeout, max_tokens=max_tokens,
+                                       on_delta=on_delta, on_finish=on_finish)
+            except Exception as exc:
+                err = f'{type(exc).__name__}: {exc}'
+            if attempt < max(1, retries) - 1:
+                time.sleep(2 ** attempt)
+        raise RuntimeError(f'LLM 流式调用失败: {err}')
+
     url = cfg['base_url'].rstrip('/') + '/chat/completions'
     headers = {'Authorization': f'Bearer {cfg["api_key"]}', 'Content-Type': 'application/json'}
     payload = {
@@ -59,15 +160,19 @@ def call_llm(cfg: dict, system: str, user: str, temperature: float = 0.3,
     }
     if max_tokens:
         payload['max_tokens'] = max_tokens
-    for attempt in range(3):
+    err = ''
+    for attempt in range(max(1, retries)):
         try:
             r = requests.post(url, headers=headers, json=payload, timeout=timeout)
             if r.status_code == 200:
                 return (r.json().get('choices') or [{}])[0].get('message', {}).get('content', '').strip()
             err = f'HTTP {r.status_code}: {r.text[:200]}'
+            # 4xx（429 除外）是确定性拒绝：请求本身不被接受，重试同一载荷没有意义
+            if 400 <= r.status_code < 500 and r.status_code != 429:
+                break
         except Exception as exc:
-            err = str(exc)
-        if attempt < 2:
+            err = f'{type(exc).__name__}: {exc}'
+        if attempt < max(1, retries) - 1:
             time.sleep(2 ** attempt)
     raise RuntimeError(f'LLM 调用失败: {err}')
 
