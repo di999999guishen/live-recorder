@@ -72,7 +72,7 @@ def main() -> int:
     ap.add_argument('--verbose', action='store_true', help='每次轮询都打印')
     ap.add_argument('--platform', default='auto', choices=['auto', 'douyin', 'bilibili'],
                     help='默认按链接域名自动判断')
-    ap.add_argument('--qn', type=int, default=10000, help='B站画质 qn：10000原画/400蓝光/250超清')
+    ap.add_argument('--qn', type=int, default=150, help='B站画质 qn，默认 150(高清)：10000原画/400蓝光/250超清/80流畅')
     args = ap.parse_args()
 
     watcher, err = build_watcher(args.target, args.platform, args.cookie, args.sign, args.qn)

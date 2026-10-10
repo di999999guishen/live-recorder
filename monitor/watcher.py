@@ -78,7 +78,7 @@ class RoomState:
 
     def pick_flv(self, prefer: Optional[list] = None) -> str:
         """按优先级挑一个画质可用的 flv 地址。"""
-        prefer = prefer or ['ORIGION', 'FULL_HD1', 'HD1', 'SD1', 'SD2']
+        prefer = prefer or ['HD1', 'FULL_HD1', 'SD1', 'ORIGION', 'SD2']
         for key in prefer:
             url = self.flv_urls.get(key)
             if url:
@@ -212,7 +212,8 @@ class LiveWatcher:
             total_user=stats.get('total_user_str') or '',
             user_count=user_count,
             flv_urls=dict(flv),
-            hls_url=hls_map.get('FULL_HD1') or next(iter(hls_map.values()), '') if hls_map else '',
+            hls_url=(hls_map.get('HD1') or hls_map.get('FULL_HD1')
+                     or next(iter(hls_map.values()), '')) if hls_map else '',
             raw=data,
         )
 

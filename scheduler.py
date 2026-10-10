@@ -20,7 +20,7 @@
         {"platform": "douyin",   "room": "123456789012", "mode": "audio",
          "quality": "HD1", "enabled": true},
         {"platform": "bilibili", "room": "1234567",      "mode": "audio",
-         "qn": 10000, "enabled": true}
+         "qn": 150, "enabled": true}
       ]
     }
 
@@ -65,7 +65,7 @@ class AnchorConfig:
     room: str
     mode: str = 'audio'
     quality: str = 'HD1'
-    qn: int = 10000
+    qn: int = 150
     enabled: bool = True
     max_seconds: int = 0
     auto_transcribe: bool = False
@@ -284,7 +284,7 @@ def load_config(path: Path) -> list:
             room=str(item.get('room', '')),
             mode=item.get('mode', 'audio'),
             quality=item.get('quality', 'HD1'),
-            qn=int(item.get('qn', 10000)),
+            qn=int(item.get('qn', 150)),
             enabled=bool(item.get('enabled', True)),
             max_seconds=int(item.get('max_seconds', 0)),
             auto_transcribe=bool(item.get('auto_transcribe', False)),

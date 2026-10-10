@@ -34,9 +34,9 @@ STATUS_ROUND = 2
 
 STATUS_TEXT = {STATUS_LIVE: '直播中', STATUS_OFF: '未开播', STATUS_ROUND: '轮播中'}
 
-# qn 画质：10000 原画 / 400 蓝光 / 250 超清 / 150 高清 / 80 流畅
+# qn 画质：10000 原画 / 400 蓝光 / 250 超清 / 150 高清(默认) / 80 流畅
 QUALITY_QN = {'ORIGION': 10000, 'FULL_HD1': 400, 'HD1': 250, 'SD1': 150, 'SD2': 80}
-DEFAULT_QN = 10000
+DEFAULT_QN = 150
 
 
 class BiliWatcher:

@@ -4,7 +4,7 @@
 用法：
     python record.py <直播间链接或 web_rid>                 一直录到主播下播
     python record.py <链接> --duration 60                   只录 60 秒（冒烟测试）
-    python record.py <链接> --mode video --quality FULL_HD1 含画面录制（注意磁盘）
+    python record.py <链接> --mode video --quality HD1      含画面录制（注意磁盘）
     python record.py <链接> --max-seconds 21600             单场最长 6 小时
 """
 import argparse
@@ -29,18 +29,19 @@ def main() -> int:
     ap = argparse.ArgumentParser(description='抖音直播录制')
     ap.add_argument('target', help='直播间链接（支持 live_web_rid= 形态）或纯数字 web_rid')
     ap.add_argument('--mode', default='audio', choices=['audio', 'video'],
-                    help='audio=仅音轨(≈51MB/h)，video=含画面(2-4GB/h)')
+                    help='audio=仅音轨(≈51MB/h)，video=含画面(≈0.9GB/h@HD1)')
     ap.add_argument('--quality', default='HD1',
-                    choices=['ORIGION', 'FULL_HD1', 'HD1', 'SD1', 'SD2'])
+                    choices=['ORIGION', 'FULL_HD1', 'HD1', 'SD1', 'SD2'],
+                    help='抖音画质，默认 HD1(高清)；ORIGION=原画/FULL_HD1=蓝光/SD1=标清/SD2=流畅')
     ap.add_argument('--duration', type=int, default=0, help='录制秒数，0 表示录到下播')
     ap.add_argument('--max-seconds', type=int, default=0, help='单场最长秒数，0 表示不限')
     ap.add_argument('--out', default='', help='输出目录，默认 data/<rid>/<日期>/<时间戳>')
     ap.add_argument('--cookie', default=DOUYIN_COOKIE)
     ap.add_argument('--platform', default='auto', choices=['auto', 'douyin', 'bilibili'])
-    ap.add_argument('--qn', type=int, default=10000, help='B站画质：10000原画/400蓝光/250超清/150高清')
+    ap.add_argument('--qn', type=int, default=150, help='B站画质，默认 150(高清)；10000原画/400蓝光/250超清/80流畅')
     args = ap.parse_args()
 
-    qn = args.qn or QUALITY_QN.get(args.quality, 10000)
+    qn = args.qn or QUALITY_QN.get(args.quality, 150)
     watcher, err = build_watcher(args.target, args.platform, args.cookie, False, qn)
     if watcher is None:
         print(f'[错误] {err}: {args.target}')

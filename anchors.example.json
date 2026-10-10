@@ -15,17 +15,17 @@
       "enabled": true,
       "max_seconds": 0,
       "auto_transcribe": false,
-      "remark": "示例：抖音主播。auto_transcribe 建议保持 false，转写交给 catchup.py 在值守结束后统一跑。"
+      "remark": "示例：抖音主播。quality 默认 HD1=高清，够转写用即可；auto_transcribe 建议保持 false，转写交给 catchup.py 在值守结束后统一跑。"
     },
     {
       "platform": "bilibili",
       "room": "1234567",
       "mode": "audio",
-      "qn": 10000,
+      "qn": 150,
       "enabled": false,
       "max_seconds": 0,
       "auto_transcribe": false,
-      "remark": "示例：B站主播。qn 10000=原画 / 400=蓝光 / 250=超清 / 150=高清。"
+      "remark": "示例：B站主播。qn 默认 150=高清 / 250=超清 / 400=蓝光 / 10000=原画。"
     }
   ]
 }

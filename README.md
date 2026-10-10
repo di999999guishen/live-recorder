@@ -91,7 +91,7 @@ python scheduler.py --room 123456789012              # 临时只盯一个房间
 # --- 单次探测 / 手动录制 ---
 python watch.py <链接> --once                        # 探测详情（含可用画质与拉流地址）
 python record.py <链接> --mode audio --duration 60   # 冒烟测试
-python record.py <链接> --mode video --quality FULL_HD1
+python record.py <链接> --mode video --quality HD1
 
 # --- 收尾兜底（幂等，可重复跑）---
 python catchup.py                                    # 今天
@@ -216,7 +216,7 @@ Linux / macOS 等价的 crontab：
     {
       "platform": "bilibili",
       "room": "1234567",
-      "qn": 10000,
+      "qn": 150,
       "mode": "audio",
       "enabled": false
     }
@@ -229,8 +229,8 @@ Linux / macOS 等价的 crontab：
 | `platform` | `douyin` / `bilibili` |
 | `room` | 抖音填 `web_rid`；B站填房间号（短号也行，会自动映射真实 room_id） |
 | `mode` | `audio`（约 51 MB/h）/ `video`（约 0.9 GB/h） |
-| `quality` | 抖音：`ORIGION` / `FULL_HD1` / `HD1` / `SD1` / `SD2` |
-| `qn` | B站画质：`10000` 原画 / `400` 蓝光 / `250` 超清 / `150` 高清 |
+| `quality` | 抖音画质，**默认 `HD1`(高清)**：`ORIGION` 原画 / `FULL_HD1` 蓝光 / `SD1` 标清 / `SD2` 流畅 |
+| `qn` | B站画质，**默认 `150`(高清)**：`10000` 原画 / `400` 蓝光 / `250` 超清 / `80` 流畅 |
 | `enabled` | `false` 则值守时跳过（但 `--check` 仍会探测，见坑位 17） |
 | `alias` | 可选。**笔记里显示的主播名**，优先级 `alias > nickname > meta.json`。平台昵称常带 emoji、会改名、会撞名，出稿文件名用它就永远在变；填个稳定的 `alias` 既能固定笔记名，也能避开与历史笔记重名 |
 | `max_seconds` | 单场最长录制秒数，`0` 不限 |
